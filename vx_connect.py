@@ -4,9 +4,7 @@ import time
 import pyautogui
 import json
 import queue
-import mouse
 import sys
-import keyboard
 
 data_queue = queue.Queue()
 
@@ -51,26 +49,26 @@ class Events :
         
         # print(f"x : {x} and y : {y}")
         # pyautogui.moveRel(x, y)
-        mouse.move(x, y, absolute=False)
+        pyautogui.moveRel(x, y)
 
 
     @classmethod    
     def on_tap_down(cls):
-        mouse.click()
+        pyautogui.click()
 
     @classmethod    
     def on_double_tap_down(cls):
-        mouse.double_click()
+        pyautogui.doubleClick()
 
 
     @classmethod    
     def on_right_click(cls):
-        mouse.click("right")
+        pyautogui.rightClick()
 
 
     @classmethod    
     def on_keyboard(cls, data):
-        keyboard.write(data["data"]);
+        pyautogui.write(data["data"]);
 
     @classmethod    
     def set_ratio(cls,data):
@@ -161,8 +159,10 @@ def start_vx_connect():
 
         if ans != "y" and ans != "yes":
             Cprint.red("Socket Connection Closed :)")
-            server_socket.close()
+            end_program();
             return
+        
+        client.sendall(b"Hello from server")
         
         buffer = ""
         while server_status:
@@ -203,8 +203,8 @@ def start_vx_connect():
 
 if __name__ == "__main__":
     # threading.Thread(target=start_vx_connect, daemon=True).start()
-    threading.Thread(target=udp_broadcast, daemon=True).start()
     threading.Thread(target=worker_loop, daemon=True).start()
+    threading.Thread(target=udp_broadcast, daemon=True).start()
     start_vx_connect()
         
 
