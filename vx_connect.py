@@ -4,10 +4,16 @@ import time
 import pyautogui
 import json
 import queue
+import mouse
+import sys
+import keyboard
 
 data_queue = queue.Queue()
 
+server_status = True;
 udp_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
 
 class Cprint:
     RED = "\033[31m"
@@ -44,24 +50,27 @@ class Events :
         y = (data["y"] * cls.height_ratio) *1.5
         
         # print(f"x : {x} and y : {y}")
-        pyautogui.moveRel(x, y)
+        # pyautogui.moveRel(x, y)
+        mouse.move(x, y, absolute=False)
 
 
     @classmethod    
     def on_tap_down(cls):
-        pyautogui.click()
+        mouse.click()
 
     @classmethod    
     def on_double_tap_down(cls):
-        pyautogui.doubleClick()
+        mouse.double_click()
+
 
     @classmethod    
     def on_right_click(cls):
-        pyautogui.rightClick()
+        mouse.click("right")
+
 
     @classmethod    
     def on_keyboard(cls, data):
-        pyautogui.write(data["data"]);
+        keyboard.write(data["data"]);
 
     @classmethod    
     def set_ratio(cls,data):
@@ -72,22 +81,39 @@ class Events :
         print(f"W : {cls.width_ratio} H : {cls.height_ratio}")
 
 
+
+def end_program():
+    global udp_server, server_socket, server_status
+    server_status = False
+    server_socket.close()
+    udp_server.close()
+    
+    Cprint.blue("Program Ended")
+    sys.exit()
+
 def udp_broadcast():
-    global udp_server
-    UDP_PORT = 36578
 
-    # Create a udp server.
-    # Provider configration to udp socket like allow broadcasting to all networks by 1.
-    udp_server.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    try :
+        global udp_server
+        UDP_PORT = 36578
+
+        # Create a udp server.
+        # Provider configration to udp socket like allow broadcasting to all networks by 1.
+        udp_server.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
 
-    while True:
-        message = f"SERVER_HERE".encode()
-        udp_server.sendto(message, ("<broadcast>", UDP_PORT))
-        time.sleep(2)
+        while server_status:
+            message = f"SERVER_HERE".encode()
+            udp_server.sendto(message, ("<broadcast>", UDP_PORT))
+            time.sleep(2)
+    except Exception as e :
+        Cprint.red("UDP server is closing...")
+        # end_program();
+
 
 def worker_loop():
-    while True :
+    global udp_server, server_socket
+    while server_status :
 
         
         decodedData =  data_queue.get()
@@ -107,20 +133,22 @@ def worker_loop():
                 Events.on_pan_update(decodedData)
             case "on_keyboard":
                 Events.on_keyboard(decodedData)
+            case "quit":
+                   end_program()
             case _:
                 print("No Event Found:", decodedData)
 
 
 
+
 def start_vx_connect():
     """Start Your Vx Connect Application Server ;)"""
-    global udp_server
+    global udp_server, server_socket
 
     HOST = "0.0.0.0"
     PORT = 8087
 
     try:
-        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.bind((HOST, PORT))
         server_socket.listen()
         Cprint.green(f"Listening on {HOST}:{PORT}")
@@ -137,7 +165,7 @@ def start_vx_connect():
             return
         
         buffer = ""
-        while True:
+        while server_status:
 
             data = client.recv(1024).decode("utf-8")
 
@@ -154,18 +182,20 @@ def start_vx_connect():
                 try:
                     decodedData = json.loads(line)
                     data_queue.put(decodedData)
+                
+                except KeyboardInterrupt:
+                    end_program()
 
                 except Exception as e:
-                            print(f"Error: {e}")
-                            udp_server.close()
-                            server_socket.close();
-                            break;
+                    print(f"Error: {e}")
+                    end_program()
+                    break;
 
-                    
+    except KeyboardInterrupt:
+        end_program()             
 
     except Exception as e:
-        server_socket.close();
-        udp_server.close()
+        end_program()
         Cprint.red(f"Server error: {e}")
 
     
